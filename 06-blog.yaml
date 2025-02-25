@@ -1,0 +1,17 @@
+---
+apiVersion: fcuic.example/v1alpha1
+kind: BlogClaim
+metadata:
+  name: blog
+  namespace: default
+spec: 
+  environment: dev
+  region: us-east-2
+  vpcCidr: 10.1.0.0/16
+  subnetCidr: 10.1.1.0/24
+  ami: ami-0a31834d359d68156
+  instanceType: small
+  compositionRef:
+    name: blog
+  writeConnectionSecretToRef:
+    name: connection-secret

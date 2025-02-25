@@ -1,0 +1,384 @@
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: blog
+spec:
+  compositeTypeRef:
+    apiVersion: fcuic.example/v1alpha1
+    kind: XBlog
+  mode: Pipeline
+  pipeline:
+  - step: patch-and-transform
+    functionRef:
+      name: function-patch-and-transform
+    input:
+      apiVersion: pt.fn.crossplane.io/v1beta1
+      kind: Resources
+      patchSets:
+      - name: common
+        patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.environment
+          toFieldPath: metadata.labels.environment
+      resources:
+      - name: vpc
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: VPC
+          metadata:
+            labels:
+              name: vpc
+          spec:
+            forProvider:
+              enableDnsHostnames: true
+              enableDnsSupport: true
+            providerConfigRef:
+              name: default
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.vpcCidr
+            toFieldPath: spec.forProvider.cidrBlock
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-vpc"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.tags.Name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-vpc"
+      - name: igw
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: InternetGateway
+          spec:
+            forProvider:
+              vpcIdSelector:
+                matchControllerRef: true
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.tags.Name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-igw"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-igw"
+      - name: public-subnet-1
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: Subnet
+          metadata:
+            labels:
+              name: public-subnet-1
+          spec:
+            forProvider:
+              mapPublicIpOnLaunch: true
+              vpcIdSelector:
+                matchControllerRef: true
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.subnetCidr
+            toFieldPath: spec.forProvider.cidrBlock
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.region
+            toFieldPath: spec.forProvider.availabilityZone
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%sa"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-public-subnet-1"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.tags.Name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-public-subnet-1"
+      - name: route-table-public
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: RouteTable
+          metadata:
+            labels:
+              name: public-route-table
+          spec:
+            forProvider:
+              vpcIdSelector:
+                matchControllerRef: true
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-public"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.tags.Name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-public-route-table"
+      - name: route-public
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: Route
+          metadata:
+            labels:
+              name: public-route
+          spec:
+            forProvider:
+              destinationCidrBlock: 0.0.0.0/0
+              gatewayIdSelector:
+                matchControllerRef: true
+              routeTableIdSelector:
+                matchControllerRef: true
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-public-route"
+      - name: public-route-table-association
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: RouteTableAssociation
+          metadata:
+            labels:
+              name: public-rta
+          spec:
+            forProvider:
+              routeTableIdSelector:
+                matchLabels:
+                  name: public-route-table
+              subnetIdSelector:
+                matchLabels:
+                  name: public-subnet-1
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-public-route-table-association"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.routeTableIdSelector.matchLabels.environment
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.subnetIdSelector.matchLabels.environment
+      - name: keypair
+        base: 
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: KeyPair
+          metadata:
+            annotations:
+              crossplane.io/external-name: blog-instance-key
+          spec:
+            forProvider:
+              publicKey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCtPP1gGJ6HuB+VGcI7ugP7lOw5h6n2IZMSVWEJa76Cv4XsKwCHPqKtyRUQfHpWKu+RPtCd2k5rQhkrdjpPeRML71AjaM7rDSz+V5K1kge+vkMnSCERhQlurAObcc1KhdS8z/R0+Am0A6zOQARl5j+b/NYaEjgJm2ljXNLNe9bofsAMlicnLLRBHtG/NQzKpJDeJTHx9w6UVjsFRx6JW9Npa+oSnziOKtoh1aCG2M4Knb0gnNynKxTuHpfv0J0rwL0WOwkqebPo9gwMaoxtjs3NLVCFw9g+LdUPSKBrn1zng7KxZ6fTNq28pFakCVjZRb6C/Nl9OYqawbjXfhNvtOSqIK0kdWmFWns0E+pd9NubcF811oSvFsARkgFG2kqTNr8ujZPgr0xYV5+/adDPfYTFdG4YY+Mw42W7oC1nvAVeEODU6X3NR8h/Csr67rVXpuXiK7WfJoPv+XiF9OypytHb8nWmAN0zv70cCrSmib4bUibk/tgirgz+MfIl9m72CV8zf1jQNJoiOHn1ztXz4RFETo8XYy3bRqoM0yc8Aa8ZYts1FpxFLbPVlsaZ/IUd/iKIN95Ac1y3moI7BLvt3rZIYGtfvmLGc1JmRX9aK6aNlPxCI20mqGAimDUW19e6EBKAbnAKitrGc1/tiE7Dt9MRW/tr/oXZnLoXLtEuphipQw== filip@Filips-MacBook-Pro.local
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-blog-instance-keypair"
+      - name: security-group
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: SecurityGroup
+          metadata:
+            labels:
+              name: web-security-group
+          spec:
+            forProvider:
+              description: Allow TLS inbound traffic
+              name: web-security-group
+              tags:
+                Name: web-security-group
+              vpcIdSelector:
+                matchLabels:
+                  name: vpc
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.vpcIdSelector.matchLabels.environment
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-web-security-group"
+      - name: security-group-rule-ssh
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: SecurityGroupRule
+          metadata:
+            labels:
+              name: ssh-rule
+          spec:
+            forProvider:
+              cidrBlocks:
+                - 0.0.0.0/0
+              description: "Allow ssh access"
+              fromPort: 22
+              toPort: 22
+              type: ingress
+              protocol: tcp
+              securityGroupIdSelector:
+                matchLabels:
+                  name: web-security-group
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-ssh-rule"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.securityGroupIdSelector.matchLabels.environment
+      - name: security-group-rule-outbound
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: SecurityGroupRule
+          metadata:
+            name: outbound-rule
+            labels:
+              name: outbound-rule
+          spec:
+            forProvider:
+              cidrBlocks:
+                - 10.0.0.0/16
+              fromPort: 0
+              toPort: 65535
+              type: egress
+              protocol: tcp
+              securityGroupIdSelector:
+                matchLabels:
+                  name: web-security-group
+        patches:
+        - type: PatchSet
+          patchSetName: common
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.environment
+          toFieldPath: metadata.name
+          transforms:
+          - type: string
+            string:
+              type: Format
+              fmt: "%s-outbound-rule"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.environment
+          toFieldPath: spec.forProvider.securityGroupIdSelector.matchLabels.environment
+      - name: instance
+        base:
+          apiVersion: ec2.aws.upbound.io/v1beta1
+          kind: Instance
+          metadata:
+            labels:
+              name: blog
+          spec:
+            forProvider:
+              keyName: blog-instance-key
+              subnetIdSelector:
+                matchLabels:
+                  name: public-subnet-1
+              vpcSecurityGroupIdSelector:
+                matchLabels:
+                  name: web-security-group
+        patches:
+          - type: PatchSet
+            patchSetName: common
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: metadata.name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-blog-instance"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.ami
+            toFieldPath: spec.forProvider.ami
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.subnetIdSelector.matchLabels.environment
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.environment
+            toFieldPath: spec.forProvider.tags.Name
+            transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "%s-blog-instance"
+          - fromFieldPath: spec.instanceType
+            toFieldPath: spec.forProvider.instanceType
+            transforms:
+              - type: map
+                map: 
+                  small: t2.small
+                  medium: t2.medium
+                  large: t2.large

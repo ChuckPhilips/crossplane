@@ -1,0 +1,33 @@
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: enable-ess
+spec:
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              args:
+                - --enable-external-secret-stores
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-ec2
+  labels:
+    name: provider-aws-ec2
+  annotations:
+    name: provider-aws-ec2
+spec:
+  packagePullPolicy: Always
+  revisionActivationPolicy: Automatic
+  revisionHistoryLimit: 1
+  skipDependencyResolution: false
+  ignoreCrossplaneConstraints: false
+  package: xpkg.upbound.io/upbound/provider-aws-ec2:v1.20.0
+  runtimeConfigRef:
+    name: enable-ess
