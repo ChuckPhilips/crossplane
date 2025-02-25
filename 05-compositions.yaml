@@ -225,7 +225,7 @@ spec:
               crossplane.io/external-name: blog-instance-key
           spec:
             forProvider:
-              publicKey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCtPP1gGJ6HuB+VGcI7ugP7lOw5h6n2IZMSVWEJa76Cv4XsKwCHPqKtyRUQfHpWKu+RPtCd2k5rQhkrdjpPeRML71AjaM7rDSz+V5K1kge+vkMnSCERhQlurAObcc1KhdS8z/R0+Am0A6zOQARl5j+b/NYaEjgJm2ljXNLNe9bofsAMlicnLLRBHtG/NQzKpJDeJTHx9w6UVjsFRx6JW9Npa+oSnziOKtoh1aCG2M4Knb0gnNynKxTuHpfv0J0rwL0WOwkqebPo9gwMaoxtjs3NLVCFw9g+LdUPSKBrn1zng7KxZ6fTNq28pFakCVjZRb6C/Nl9OYqawbjXfhNvtOSqIK0kdWmFWns0E+pd9NubcF811oSvFsARkgFG2kqTNr8ujZPgr0xYV5+/adDPfYTFdG4YY+Mw42W7oC1nvAVeEODU6X3NR8h/Csr67rVXpuXiK7WfJoPv+XiF9OypytHb8nWmAN0zv70cCrSmib4bUibk/tgirgz+MfIl9m72CV8zf1jQNJoiOHn1ztXz4RFETo8XYy3bRqoM0yc8Aa8ZYts1FpxFLbPVlsaZ/IUd/iKIN95Ac1y3moI7BLvt3rZIYGtfvmLGc1JmRX9aK6aNlPxCI20mqGAimDUW19e6EBKAbnAKitrGc1/tiE7Dt9MRW/tr/oXZnLoXLtEuphipQw== filip@Filips-MacBook-Pro.local
+              publicKey: your public key
         patches:
           - type: PatchSet
             patchSetName: common
